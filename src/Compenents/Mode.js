@@ -1,18 +1,18 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { Canvas, extend, useThree, useFrame } from 'react-three-fiber';
+import React, { useRef, useState } from 'react';
+import { Canvas, extend, useThree } from 'react-three-fiber';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 extend({ OrbitControls });
 
 function Mode() {
   const meshRef = useRef();
-  const [highlightedSurfaces, setHighlightedSurfaces] = useState([]);
-  const [isDragging, setDragging] = useState(false);
+  const [highlightedSurface, setHighlightedSurface] = useState(null);
+  const [comment, setComment] = useState('');
+  const [comments, setComments] = useState([]);
 
   const Controls = () => {
     const controls = useRef();
     const { camera, gl } = useThree();
-    useFrame(() => controls.current.update());
     return <orbitControls ref={controls} args={[camera, gl.domElement]} />;
   };
 
@@ -20,86 +20,56 @@ function Mode() {
     const intersection = event.intersections[0];
     if (intersection) {
       const { object } = intersection;
-      setDragging(true);
-      setHighlightedSurfaces((prevSurfaces) => {
-        const { width, height, depth } = object.geometry.parameters;
-        return [...prevSurfaces, { object, width, height, depth }];
-      });
+      setHighlightedSurface(object);
+    } else {
+      setHighlightedSurface(null);
     }
   };
-  
-  const handleMouseMove = (event) => {
-    if (isDragging) {
-      const intersection = event.intersections[0];
-      if (intersection) {
-        const { object } = intersection;
-        const currentSurfaceIndex = highlightedSurfaces.length - 1;
-        if (object !== highlightedSurfaces[currentSurfaceIndex].object) {
-          setHighlightedSurfaces((prevSurfaces) => {
-            const updatedSurfaces = [...prevSurfaces];
-            updatedSurfaces[currentSurfaceIndex].object = object;
-            return updatedSurfaces;
-          });
-        }
-      }
+
+  const handleCommentChange = (event) => {
+    setComment(event.target.value);
+  };
+
+  const handleSubmit = () => {
+    if (comment.trim() !== '') {
+      const newComment = {
+        id: comments.length + 1,
+        text: comment
+      };
+      setComments((prevComments) => [...prevComments, newComment]);
+      setComment('');
     }
   };
-  
-  
-  const handleMouseUp = () => {
-    setDragging(false);
-  };
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      switch (event.code) {
-        case 'ArrowUp':
-          meshRef.current.rotation.x -= 0.1;
-          break;
-        case 'ArrowDown':
-          meshRef.current.rotation.x += 0.1;
-          break;
-        case 'ArrowLeft':
-          meshRef.current.rotation.y -= 0.1;
-          break;
-        case 'ArrowRight':
-          meshRef.current.rotation.y += 0.1;
-          break;
-        default:
-          break;
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, []);
 
   return (
     <div>
-      <Canvas>
-        <mesh
-          ref={meshRef}
-          onPointerDown={handleMouseDown}
-          onPointerMove={handleMouseMove}
-          onPointerUp={handleMouseUp}
-        >
-          <Controls />
-          <boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
-          <meshBasicMaterial attach="material" color="white" />
-        </mesh>
-        {highlightedSurfaces.map((surface, index) => {
-  const { object, width, height, depth } = surface;
-  return (
-    <mesh key={index} position={object.position}>
-      <boxBufferGeometry attach="geometry" args={[width, height, depth]} />
-      <meshBasicMaterial attach="material" color="yellow" transparent opacity={0.5} />
-    </mesh>
-  );
-})}
-      </Canvas>
+      <div style={{ marginBottom: '1rem' }}>
+        <input type="text" value={comment} onChange={handleCommentChange} />
+        <button onClick={handleSubmit}>Submit</button>
+      </div>
+      <div>
+        <Canvas>
+          <mesh ref={meshRef} onClick={handleMouseDown}>
+            <Controls />
+            <boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
+            <meshBasicMaterial attach="material" color="white" />
+          </mesh>
+          {highlightedSurface && (
+            <mesh position={highlightedSurface.position}>
+              <boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
+              <meshBasicMaterial attach="material" color="yellow" transparent opacity={0.5} />
+            </mesh>
+          )}
+        </Canvas>
+      </div>
+      <div>
+        <strong>Comments:</strong>
+        <ul>
+          {comments.map((comment) => (
+            <li key={comment.id}>{comment.text}</li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
