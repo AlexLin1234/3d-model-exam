@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Canvas, extend, useThree } from 'react-three-fiber';
+import React, { useRef, useState, useEffect } from 'react';
+import { extend, useThree } from 'react-three-fiber';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 
 extend({ OrbitControls });
@@ -10,22 +10,67 @@ function Mode() {
   const [comment, setComment] = useState('');
   const [comments, setComments] = useState([]);
 
+  const startX = useRef(null);
+  const startY = useRef(null);
+  const canvasRef = useRef(null);
+  const contextRef = useRef(null);
+
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  const canvasOffSetX = useRef(null);
+  const canvasOffSetY = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    canvas.width = 500;
+    canvas.height = 500;
+
+    const context = canvas.getContext("2d");
+    context.lineCap = "round";
+    context.strokeStyle = "black";
+    context.lineWidth = 5;
+    contextRef.current = context;
+
+    const canvasOffSet = canvas.getBoundingClientRect();
+    canvasOffSetX.current = canvasOffSet.top;
+    canvasOffSetY.current = canvasOffSet.left;
+}, []);
+
+
   const Controls = () => {
     const controls = useRef();
     const { camera, gl } = useThree();
     return <orbitControls ref={controls} args={[camera, gl.domElement]} />;
   };
 
-  const handleMouseDown = (event) => {
-    const intersection = event.intersections[0];
-    if (intersection) {
-      const { object } = intersection;
-      setHighlightedSurface(object);
-    } else {
-      setHighlightedSurface(null);
-    }
+  const handleMouseDown = (nativeEvent) => {
+    startX.current = nativeEvent.clientX - canvasOffSetX.current;
+    startY.current = nativeEvent.clientY - canvasOffSetY.current;
   };
+  const handleMouseMove = (nativeEvent) => {
+    if (!isDrawing) {
+      return;
+  }
 
+  nativeEvent.preventDefault();
+  nativeEvent.stopPropagation();
+
+  const newMouseX = nativeEvent.clientX - canvasOffSetX.current;
+  const newMouseY = nativeEvent.clientY - canvasOffSetY.current;
+
+  const rectWidht = newMouseX - startX.current;
+  const rectHeight = newMouseY - startY.current;
+
+  contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+
+  contextRef.current.strokeRect(startX.current, startY.current, rectWidht, rectHeight);
+  };
+  const handleMouseUp = (nativeEvent) => {
+
+    setIsDrawing(false);
+
+  };
+  
   const handleCommentChange = (event) => {
     setComment(event.target.value);
   };
@@ -48,8 +93,13 @@ function Mode() {
         <button onClick={handleSubmit}>Submit</button>
       </div>
       <div>
-        <Canvas>
-          <mesh ref={meshRef} onClick={handleMouseDown}>
+      <canvas className="canvas-container-rect"
+
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}>
+          <mesh ref={meshRef} onClick={handleMouseDown} >
             <Controls />
             <boxBufferGeometry attach="geometry" args={[1, 1, 1]} />
             <meshBasicMaterial attach="material" color="white" />
@@ -60,7 +110,7 @@ function Mode() {
               <meshBasicMaterial attach="material" color="yellow" transparent opacity={0.5} />
             </mesh>
           )}
-        </Canvas>
+        </canvas>
       </div>
       <div>
         <strong>Comments:</strong>
